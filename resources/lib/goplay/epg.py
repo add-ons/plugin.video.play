@@ -74,12 +74,11 @@ class EpgApi:
 
     EPG_ENDPOINTS = {
         # 'Play4': 'https://www.goplay.be/api/epg/vier/{date}',
-        'Play 4': 'https://www.goplay.be/tv-gids/vier/{date}',
-        'Play 5': 'https://www.goplay.be/tv-gids/vijf/{date}',
-        'Play 6': 'https://www.goplay.be/tv-gids/zes/{date}',
-        'Play 7': 'https://www.goplay.be/tv-gids/zeven/{date}',
-        'Play Crime': 'https://www.goplay.be/tv-gids/crime/{date}'
-
+        'Play 4': 'https://www.play.tv/tv-gids/play/{date}',
+        'Play 5': 'https://www.play.tv/tv-gids/fictie/{date}',
+        'Play 6': 'https://www.play.tv/tv-gids/actie/{date}',
+        'Play 7': 'https://www.play.tv/tv-gids/reality/{date}',
+        'Play Crime': 'https://www.play.tv/tv-gids/crime/{date}'
     }
 
     EPG_NO_BROADCAST = 'Geen uitzending'
@@ -110,7 +109,7 @@ class EpgApi:
 
         try:
             response = self._get_url(self.EPG_ENDPOINTS.get(channel).format(date=date))
-            _LOGGER.info("Date is %s and channel is %s", date, channel)
+            _LOGGER.info(f"Date is {date} and channel is {channel}")
             pattern = r'\\"id\\":\\"tvguide-list\\",\\"children\\":(.*?\]\)<\/script><\/body><\/html>)'
             stresult = re.search(pattern,response)
             stresult=stresult.group(1)
@@ -119,21 +118,21 @@ class EpgApi:
             pattern = r'\"children\":(.*?\]\))<\/script><\/body><\/html>'
             resp = re.search(pattern,stresult)
             resp = resp.group(1)
-            pattern = r'}}],("\$L.*?\])'
+            pattern = r'}],("\$L.*?\])'
             nextjs = re.search(pattern,resp)
             respnjs='[' + nextjs.group(1)
             lst = json.loads(respnjs)
             nextst = ''
-            for i, _ in enumerate(lst):   # some elements are missing: missing $
+            for i, val in enumerate(lst):   # some elements are missing: missing $
                 ref=lst[i].replace('$L','')
-                psstr=r'<script>self\.__next_f\.push\(\[1,"' + ref + r':(\["\$".*?}}])'
+                psstr=r'<script>self\.__next_f\.push\(\[1,"' + ref + r':(\["\$".*?}])'
                 match = re.search(psstr, resp)
                 if match:
                     respnjs = match.group(1)
                     nextst += ',' + respnjs
                 else:
-                    _LOGGER.warning("No match found for reference: %s", ref)
-            pattern = r'\"children\":(.*?}}]),\"\$L'   # r'\"children\":(.*?\"}}],)\"\$L'"
+                    _LOGGER.warning(f"No match found for reference: {ref}")
+            pattern = r'\"children\":(.*?}]),\"\$L'   # r'\"children\":(.*?\"}}],)\"\$L'"
             resp = re.search(pattern,stresult)
             resp = resp.group(1) + nextst + "]"
             data = json.loads(resp)
