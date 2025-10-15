@@ -1,18 +1,18 @@
-[![GitHub release](https://img.shields.io/github/v/release/add-ons/plugin.video.goplay?display_name=tag)](https://github.com/add-ons/plugin.video.goplay/releases)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/add-ons/plugin.video.goplay/ci.yml?branch=master)](https://github.com/add-ons/plugin.video.goplay/actions?query=branch%3Amaster)
-[![Codecov status](https://img.shields.io/codecov/c/github/add-ons/plugin.video.goplay/master)](https://codecov.io/gh/add-ons/plugin.video.goplay/branch/master)
+[![GitHub release](https://img.shields.io/github/v/release/add-ons/plugin.video.play?display_name=tag)](https://github.com/add-ons/plugin.video.play/releases)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/add-ons/plugin.video.play/ci.yml?branch=master)](https://github.com/add-ons/plugin.video.play/actions?query=branch%3Amaster)
+[![Codecov status](https://img.shields.io/codecov/c/github/add-ons/plugin.video.play/master)](https://codecov.io/gh/add-ons/plugin.video.play/branch/master)
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-yellow.svg)](https://opensource.org/licenses/GPL-3.0)
-[![Contributors](https://img.shields.io/github/contributors/add-ons/plugin.video.goplay.svg)](https://github.com/add-ons/plugin.video.goplay/graphs/contributors)
+[![Contributors](https://img.shields.io/github/contributors/add-ons/plugin.video.play.svg)](https://github.com/add-ons/plugin.video.play/graphs/contributors)
 
-# GoPlay Kodi add-on
+# Play Kodi add-on
 
-*plugin.video.goplay* is een Kodi add-on om de video-on-demand content van [GoPlay](https://www.goplay.be/) te bekijken. Hiervoor dien je eerst een
-account op [goplay.be](https://www.goplay.be/) aan te maken.
+*plugin.video.play* is een Kodi add-on om de video-on-demand content van [Play](https://www.play.tv/) te bekijken. Hiervoor dien je eerst een
+account op [play.tv](https://www.play.tv/) aan te maken.
 
 ## Features
 
 De volgende features worden ondersteund:
-* Bekijk on-demand content van Play4, Play5, Play6, Play7 en Play Crime
+* Bekijk on-demand content van Play, Play Fictie, Play Actie, Play Reality en Play Crime
 * Doorzoeken van alle programma's
 
 ## Screenshots
@@ -26,9 +26,5 @@ De volgende features worden ondersteund:
  </table>
 
 ## Changelog
-## [v0.5.1](https://github.com/add-ons/plugin.video.goplay/tree/v0.5.1) (2024-10-21)
-- Fix caching (@mediaminister)
-- Add support for external Widevine device (@mediaminister)
-
-## [v0.5.0](https://github.com/add-ons/plugin.video.goplay/tree/v0.5.0) (2024-09-11)
-- Update to new GoPlay API (@mediaminister)
+## [v0.6.0](https://github.com/add-ons/plugin.video.play/tree/v0.6.0) (2025-10-15)
+- Play rebranding (@mediaminister)

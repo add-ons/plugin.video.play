@@ -7,15 +7,15 @@ import os
 import time
 
 from resources.lib import kodiutils
-from resources.lib.goplay.aws.cognito_identity import CognitoIdentity
-from resources.lib.goplay.aws.cognito_idp import AuthenticationException, CognitoIdp, InvalidLoginException
-from resources.lib.goplay.aws.cognito_sync import CognitoSync
+from resources.lib.play.aws.cognito_identity import CognitoIdentity
+from resources.lib.play.aws.cognito_idp import AuthenticationException, CognitoIdp, InvalidLoginException
+from resources.lib.play.aws.cognito_sync import CognitoSync
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class AuthApi:
-    """ GoPlay Authentication API """
+    """ Play Authentication API """
     COGNITO_REGION = 'eu-west-1'
     COGNITO_POOL_ID = 'eu-west-1_dViSsKM5Y'
     COGNITO_CLIENT_ID = '6s1h851s8uplco5h6mqh1jac8m'

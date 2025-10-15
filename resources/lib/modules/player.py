@@ -4,9 +4,9 @@
 import logging
 
 from resources.lib import kodiutils
-from resources.lib.goplay.auth import AuthApi
-from resources.lib.goplay.aws.cognito_idp import AuthenticationException, InvalidLoginException
-from resources.lib.goplay.content import ApiException, ContentApi, GeoblockedException, MissingModuleException, UnavailableException
+from resources.lib.play.auth import AuthApi
+from resources.lib.play.aws.cognito_idp import AuthenticationException, InvalidLoginException
+from resources.lib.play.content import ApiException, ContentApi, GeoblockedException, MissingModuleException, UnavailableException
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,28 +21,6 @@ class Player:
 
         # Workaround for Raspberry Pi 3 and older
         kodiutils.set_global_setting('videoplayer.useomxplayer', True)
-
-    def live(self, uuid):
-        """ Play the live channel.
-        :type uuid: str
-        """
-        # TODO: this doesn't work correctly, playing a live program from the PVR won't play something from the beginning
-        # Lookup current program
-        # broadcast = self._epg.get_broadcast(channel, datetime.datetime.now().isoformat())
-        # if broadcast and broadcast.video_url:
-        #     self.play_from_page(broadcast.video_url)
-        #     return
-        if "lay" in uuid:  #Channel name from IPTV_manager => get uuid
-            try:
-                items = self._api.get_live_channels()
-            except Exception as ex:
-                kodiutils.notification(message=str(ex))
-                raise
-            channel = next(channel for channel in items if channel.title == uuid)
-            print(f"uuid entry is {uuid}")
-            uuid=channel.uuid
-
-        self.play(uuid, 'live_channel')
 
     def play(self, uuid, content_type):
         """ Play the requested item.

@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <settings version="1">
-	<section id="plugin.video.goplay">
+	<section id="plugin.video.play">
 		<category id="credentials" label="30800" help="">  <!-- Credentials -->
 			<group id="1" label="30801">
 				<setting id="username" type="string" label="30802" help="">
@@ -59,14 +59,14 @@
 	                	</control>
                 	</setting>
 			<setting id="iptv.channels_uri" type="string">
-			    	<default>plugin://plugin.video.goplay/iptv/channels</default>
+			    	<default>plugin://plugin.video.play/iptv/channels</default>
 	                	<control type="edit" format="string">
 		                	<heading></heading>
 	                	</control>
                     		<visible>false</visible>
                 	</setting>
 			<setting id="iptv.epg_uri" type="string">
-				<default>plugin://plugin.video.goplay/iptv/epg</default>
+				<default>plugin://plugin.video.play/iptv/epg</default>
 	                	<control type="edit" format="string">
 		                	<heading></heading>
 	                	</control>
@@ -110,7 +110,7 @@
 		                <allowempty>true</allowempty>
 	                </constraints>
 	                <control type="button" format="action">
-		                <data>RunPlugin(plugin://plugin.video.goplay/cache/clear)</data>
+		                <data>RunPlugin(plugin://plugin.video.play/cache/clear)</data>
 	                </control>
                 </setting>
             </group>

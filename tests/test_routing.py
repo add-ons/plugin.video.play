@@ -38,7 +38,7 @@ class TestRouting(unittest.TestCase):
         routing.run([routing.url_for(addon.show_recommendations), '0', ''])
 
     def test_recommendations_category_menu(self):
-        routing.run([routing.url_for(addon.show_recommendations_category, category='2'), '0', ''])  # 2 Net toegevoegd op GoPlay
+        routing.run([routing.url_for(addon.show_recommendations_category, category='2'), '0', ''])  # 2 Net toegevoegd op Play
 
     def test_catalog_channel_menu(self):
         routing.run([routing.url_for(addon.show_channel_catalog, channel='Play4'), '0', ''])

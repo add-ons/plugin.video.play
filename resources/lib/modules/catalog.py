@@ -5,8 +5,8 @@ import logging
 from urllib.parse import unquote_plus
 
 from resources.lib import kodiutils
-from resources.lib.goplay.auth import AuthApi
-from resources.lib.goplay.content import CACHE_PREVENT, ContentApi, UnavailableException
+from resources.lib.play.auth import AuthApi
+from resources.lib.play.content import CACHE_PREVENT, ContentApi, UnavailableException
 from resources.lib.modules.menu import Menu
 
 _LOGGER = logging.getLogger(__name__)

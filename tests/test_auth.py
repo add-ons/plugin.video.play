@@ -5,7 +5,7 @@ import logging
 import unittest
 
 from resources.lib import kodiutils
-from resources.lib.goplay.auth import AuthApi
+from resources.lib.play.auth import AuthApi
 
 _LOGGER = logging.getLogger(__name__)
 

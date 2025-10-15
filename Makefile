@@ -24,7 +24,7 @@ check-translations:
 check-addon: build
 	@printf ">>> Running addon checks\n"
 	$(eval TMPDIR := $(shell mktemp -d))
-	@unzip dist/plugin.video.goplay-*.zip -d ${TMPDIR}
+	@unzip dist/plugin.video.play-*.zip -d ${TMPDIR}
 	cd ${TMPDIR} && kodi-addon-checker --branch=matrix
 	@rm -rf ${TMPDIR}
 

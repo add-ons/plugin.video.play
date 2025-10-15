@@ -4,8 +4,8 @@
 import logging
 
 from resources.lib import kodiutils
-from resources.lib.goplay.auth import AuthApi
-from resources.lib.goplay.content import ContentApi
+from resources.lib.play.auth import AuthApi
+from resources.lib.play.content import ContentApi
 from resources.lib.modules.menu import Menu
 
 _LOGGER = logging.getLogger(__name__)
