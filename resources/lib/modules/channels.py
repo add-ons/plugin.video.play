@@ -64,6 +64,7 @@ class Channels:
             raise
 
         channel = next(channel for channel in items if channel.uuid == uuid)
+        channel_id = (channel.brand or channel.title).lower()
 
         listing = []
 
@@ -86,7 +87,7 @@ class Channels:
         listing.append(
             kodiutils.TitleItem(
                 title=kodiutils.localize(30055, channel=channel.title),  # Catalog for {channel}
-                path=kodiutils.url_for('show_channel_catalog', channel=channel.brand.lower()),
+                path=kodiutils.url_for('show_channel_catalog', channel=channel_id),
                 art_dict={
                     'icon': 'DefaultMovieTitle.png',
                     'fanart': channel.fanart,
