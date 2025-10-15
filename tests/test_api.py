@@ -6,9 +6,9 @@ import os
 import unittest
 
 from resources.lib import kodiutils
-from resources.lib.goplay import ResolvedStream
-from resources.lib.goplay.auth import AuthApi
-from resources.lib.goplay.content import ContentApi, GeoblockedException, Program, CACHE_PREVENT, Category
+from resources.lib.play import ResolvedStream
+from resources.lib.play.auth import AuthApi
+from resources.lib.play.content import ContentApi, GeoblockedException, Program, CACHE_PREVENT, Category
 
 _LOGGER = logging.getLogger(__name__)
 

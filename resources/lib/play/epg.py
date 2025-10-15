@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """ EPG API """
 
+import ast
 import re
 import json
 import logging
@@ -70,17 +71,9 @@ class EpgProgram:
 
 
 class EpgApi:
-    """ GoPlay EPG API """
+    """ Play EPG API """
 
-    EPG_ENDPOINTS = {
-        # 'Play4': 'https://www.goplay.be/api/epg/vier/{date}',
-        'Play 4': 'https://www.goplay.be/tv-gids/vier/{date}',
-        'Play 5': 'https://www.goplay.be/tv-gids/vijf/{date}',
-        'Play 6': 'https://www.goplay.be/tv-gids/zes/{date}',
-        'Play 7': 'https://www.goplay.be/tv-gids/zeven/{date}',
-        'Play Crime': 'https://www.goplay.be/tv-gids/crime/{date}'
-
-    }
+    EPG_ENDPOINT = 'https://www.play.tv/tv-gids/{channel}/{date}'
 
     EPG_NO_BROADCAST = 'Geen uitzending'
 
@@ -95,8 +88,6 @@ class EpgApi:
         :rtype list[EpgProgram]
         """
         #_LOGGER.info("Getting info for channel %s on date %s", channel, date)
-        if channel not in self.EPG_ENDPOINTS:
-            raise Exception('Unknown channel %s' % channel)
 
         if date is None:
             # Fetch today when no date is specified
@@ -109,35 +100,24 @@ class EpgApi:
             date = (datetime.today() + timedelta(days=1)).strftime('%Y-%m-%d')
 
         try:
-            response = self._get_url(self.EPG_ENDPOINTS.get(channel).format(date=date))
+            response = self._get_url(self.EPG_ENDPOINT.format(channel=channel.split()[-1].lower(), date=date))
             _LOGGER.info("Date is %s and channel is %s", date, channel)
-            pattern = r'\\"id\\":\\"tvguide-list\\",\\"children\\":(.*?\]\)<\/script><\/body><\/html>)'
-            stresult = re.search(pattern,response)
-            stresult=stresult.group(1)
-            stresult=stresult.replace(r'\\\"',r'\\\'')
-            stresult=stresult.replace('\\','')
-            pattern = r'\"children\":(.*?\]\))<\/script><\/body><\/html>'
-            resp = re.search(pattern,stresult)
-            resp = resp.group(1)
-            pattern = r'}}],("\$L.*?\])'
-            nextjs = re.search(pattern,resp)
-            respnjs='[' + nextjs.group(1)
-            lst = json.loads(respnjs)
-            nextst = ''
-            for i, _ in enumerate(lst):   # some elements are missing: missing $
-                ref=lst[i].replace('$L','')
-                psstr=r'<script>self\.__next_f\.push\(\[1,"' + ref + r':(\["\$".*?}}])'
-                match = re.search(psstr, resp)
-                if match:
-                    respnjs = match.group(1)
-                    nextst += ',' + respnjs
-                else:
-                    _LOGGER.warning("No match found for reference: %s", ref)
-            pattern = r'\"children\":(.*?}}]),\"\$L'   # r'\"children\":(.*?\"}}],)\"\$L'"
-            resp = re.search(pattern,stresult)
-            resp = resp.group(1) + nextst + "]"
-            data = json.loads(resp)
-            return [self._parse_program(channel, x) for x in data if self.EPG_NO_BROADCAST not in x[3]['program']['programTitle']]
+
+            fragments = re.findall(r'<script>self.__next_f.push\((?P<fragment>.*?)\)<\/script>', response, re.DOTALL)
+            programs = []
+            for item in fragments:
+                data_list = ast.literal_eval(item)
+                parts = re.findall(r'",({.*?\"})]', data_list[-1], re.DOTALL)
+                for program in parts:
+                    program = program.replace('$undefined', 'null')
+                    try:
+                        program = json.loads(program)
+                    except json.JSONDecodeError:
+                        continue
+                    if program.get('program'):
+                        programs.append(program)
+
+            return [self._parse_program(channel, x) for x in programs if self.EPG_NO_BROADCAST not in x['program']['programTitle']]
         except Exception as e:  # pylint: disable=broad-exception-caught
             ptitle = f"Error occured : {e}"
             _LOGGER.info("Date is %s and channel is %s, %s", date, channel, ptitle)
@@ -153,38 +133,38 @@ class EpgApi:
         :type data: dict
         :rtype EpgProgram
         """
-        duration = int(data[3]['program']['duration']) if data[3]['program']['duration'] else None
+        duration = int(data['program']['duration']) if data['program']['duration'] else None
         # Check if this broadcast is currently airing
         timestamp = datetime.now().replace(tzinfo=dateutil.tz.gettz('CET'))
-        start = datetime.fromtimestamp(data[3]['program']['timestamp']).replace(tzinfo=dateutil.tz.gettz('CET'))
+        start = datetime.fromtimestamp(data['program']['timestamp']).replace(tzinfo=dateutil.tz.gettz('CET'))
         if duration:
             airing = bool(start <= timestamp < (start + timedelta(seconds=duration)))
         else:
             airing = False
 
         # Only allow direct playing if the linked video is the actual program
-        if data[3]['program']['video']:
-            video_url = data[3]['program']['video']['uuid']
-            thumb = data[3]['program']['video']['data']['images']['default']
+        if data['program']['video']:
+            video_url = data['program']['video']['uuid']
+            thumb = data['program']['video']['data']['images']['default']
         else:
             video_url = None
             thumb = None
 
         epg_program = EpgProgram(
             channel=channel,
-            program_title=data[3]['program']['programTitle'],
-            episode_title=data[3]['program']['episodeTitle'],
-            episode_title_original=data[3]['program']['originalTitle'],
-            number=int(data[3]['program']['episodeNr']) if data[3]['program']['episodeNr'] else None,
-            season=data[3]['program']['season'],
-            genre=data[3]['program']['genre'],
+            program_title=data['program']['programTitle'],
+            episode_title=data['program']['episodeTitle'],
+            episode_title_original=data['program']['originalTitle'],
+            number=int(data['program']['episodeNr']) if data['program']['episodeNr'] else None,
+            season=data['program']['season'],
+            genre=data['program']['genre'],
             start=start,
-            won_id=int(data[3]['program']['wonId']) if data[3]['program']['wonId'] else None,
-            won_program_id=int(data[3]['program']['wonProgramId']) if data[3]['program']['wonProgramId'] else None,
-            program_description=data[3]['program']['programConcept'],
-            description=data[3]['program']['contentEpisode'],
+            won_id=int(data['program']['wonId']) if data['program']['wonId'] else None,
+            won_program_id=int(data['program']['wonProgramId']) if data['program']['wonProgramId'] else None,
+            program_description=data['program']['programConcept'],
+            description=data['program']['contentEpisode'],
             duration=duration,
-            program_url=data[3]['program']['program']['uuid'] if data[3]['program']['program'] else None,
+            program_url=data['program']['program']['uuid'] if data['program']['program'] else None,
             video_url=video_url,
             thumb=thumb,
             airing=airing,

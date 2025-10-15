@@ -4,9 +4,9 @@
 import logging
 
 from resources.lib import kodiutils
-from resources.lib.goplay import STREAM_DICT
-from resources.lib.goplay.auth import AuthApi
-from resources.lib.goplay.content import ContentApi
+from resources.lib.play import STREAM_DICT
+from resources.lib.play.auth import AuthApi
+from resources.lib.play.content import ContentApi
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ class Channels:
         listing.append(
             kodiutils.TitleItem(
                 title=kodiutils.localize(30055, channel=channel.title),  # Catalog for {channel}
-                path=kodiutils.url_for('show_channel_catalog', channel=channel.title),
+                path=kodiutils.url_for('show_channel_catalog', channel=channel.brand.lower()),
                 art_dict={
                     'icon': 'DefaultMovieTitle.png',
                     'fanart': channel.fanart,
@@ -100,7 +100,7 @@ class Channels:
         listing.append(
             kodiutils.TitleItem(
                 title=kodiutils.localize(30052, channel=channel.title),  # Watch live {channel}
-                path=kodiutils.url_for('play_live', channel=channel.uuid) + '?.pvr',
+                path=kodiutils.url_for('play_catalog', uuid=channel.uuid, content_type='live_channel') + '?.pvr',
                 art_dict={
                     'icon': channel.logo,
                     'fanart': channel.fanart,

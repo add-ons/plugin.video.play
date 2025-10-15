@@ -5,8 +5,8 @@ import logging
 from urllib.parse import quote, quote_plus
 
 from resources.lib import kodiutils
-from resources.lib.goplay import STREAM_DICT
-from resources.lib.goplay.content import Episode, Program
+from resources.lib.play import STREAM_DICT
+from resources.lib.play.content import Episode, Program
 from resources.lib.kodiutils import TitleItem
 
 _LOGGER = logging.getLogger(__name__)

@@ -12,7 +12,7 @@ from xml.etree.ElementTree import XML
 import requests
 
 from resources.lib import kodiutils
-from resources.lib.goplay import ResolvedStream
+from resources.lib.play import ResolvedStream
 from resources.lib.kodiutils import STREAM_DASH, STREAM_HLS, html_to_kodi
 
 _LOGGER = logging.getLogger(__name__)
@@ -221,9 +221,9 @@ class Channel:
 
 
 class ContentApi:
-    """ GoPlay Content API"""
-    SITE_URL = 'https://www.goplay.be'
-    API_GOPLAY = 'https://api.goplay.be'
+    """ Play Content API"""
+    SITE_URL = 'https://www.play.tv'
+    API_PLAY = 'https://api.play.tv'
     LICENSE_URL = 'https://widevine.keyos.com/api/v4/getLicense'
 
     def __init__(self, auth=None, cache_path=None):
@@ -231,22 +231,6 @@ class ContentApi:
         self._session = requests.session()
         self._auth = auth
         self._cache_path = cache_path
-
-    @staticmethod
-    def channel2brand(channel):
-        """ Maps a channel name to a brand id
-        :type channel: str
-        :rtype str
-        """
-        brands = {
-            'Play 4': 'vier',
-            'Play 5': 'vijf',
-            'Play 6': 'zes',
-            'Play 7': 'zeven',
-            'GoPlay': 'goplay',
-            'Play Crime': 'play crime',
-        }
-        return brands.get(channel)
 
     def get_programs(self, channel=None, category=None):
         """ Get all programs optionally filtered by channel or category.
@@ -265,7 +249,7 @@ class ContentApi:
         value = None
         if channel:
             key = 'channel'
-            value = self.channel2brand(channel)
+            value = channel
         elif category:
             key = 'category_id'
             value = category
@@ -283,7 +267,7 @@ class ContentApi:
         def update():
             """ Fetch the program metadata """
             # Fetch webpage
-            result = self._get_url(self.API_GOPLAY + '/tv/v2/programs/%s' % uuid)
+            result = self._get_url(self.API_PLAY + '/tv/v2/programs/%s' % uuid)
             data = json.loads(result)
             return data
 
@@ -304,7 +288,7 @@ class ContentApi:
         def update():
             """ Fetch the program metadata """
             # Fetch webpage
-            result = self._get_url(self.API_GOPLAY + '/tv/v1/liveStreams', authentication='Bearer %s' % self._auth.get_token())
+            result = self._get_url(self.API_PLAY + '/tv/v1/liveStreams', authentication='Bearer %s' % self._auth.get_token())
             data = json.loads(result)
             return data
 
@@ -329,7 +313,7 @@ class ContentApi:
         def update():
             """ Fetch the program metadata """
             # Fetch webpage
-            result = self._get_url(self.API_GOPLAY + '/tv/v1/playlists/%s?offset=%s&limit=%s' % (playlist_uuid, offset, limit), authentication='Bearer %s' % self._auth.get_token())
+            result = self._get_url(self.API_PLAY + '/tv/v1/playlists/%s?offset=%s&limit=%s' % (playlist_uuid, offset, limit), authentication='Bearer %s' % self._auth.get_token())
             data = json.loads(result)
             return data
 
@@ -353,7 +337,7 @@ class ContentApi:
             mode = 'videos/short-form'
         elif content_type == 'live_channel':
             mode = 'liveStreams'
-        response = self._get_url(self.API_GOPLAY + '/tv/v1/%s/%s' % (mode, uuid), authentication='Bearer %s' % self._auth.get_token())
+        response = self._get_url(self.API_PLAY + '/tv/v1/%s/%s' % (mode, uuid), authentication='Bearer %s' % self._auth.get_token())
         data = json.loads(response)
 
         if not data:
@@ -444,7 +428,7 @@ class ContentApi:
 
         def update():
             """ Fetch the pages metadata """
-            data = self._get_url(self.API_GOPLAY + '/tv/v2/pages/%s' % page, authentication='Bearer %s' % self._auth.get_token())
+            data = self._get_url(self.API_PLAY + '/tv/v2/pages/%s' % page, authentication='Bearer %s' % self._auth.get_token())
             result = json.loads(data)
             return result
 
@@ -474,7 +458,7 @@ class ContentApi:
             got_everything = False
             offset = 0
             while not got_everything:
-                data = self._get_url(self.API_GOPLAY + '/tv/v2/pages/%s/lanes/%s?limit=%s&offset=%s' % (page, index, limit, offset), authentication='Bearer %s' % self._auth.get_token())
+                data = self._get_url(self.API_PLAY + '/tv/v2/pages/%s/lanes/%s?limit=%s&offset=%s' % (page, index, limit, offset), authentication='Bearer %s' % self._auth.get_token())
                 result = json.loads(data)
                 cards.extend(result.get('cards'))
                 total = result.get('total')
@@ -504,7 +488,7 @@ class ContentApi:
             cards = []
             got_everything = False
             while not got_everything:
-                data = self._post_url(self.API_GOPLAY + '/tv/v1/search', data=payload, authentication='Bearer %s' % self._auth.get_token())
+                data = self._post_url(self.API_PLAY + '/tv/v1/search', data=payload, authentication='Bearer %s' % self._auth.get_token())
                 result = json.loads(data)
                 cards.extend(result.get('cards'))
                 total = result.get('total')
@@ -525,7 +509,7 @@ class ContentApi:
         :rtype list[Program]
         """
         data = self._get_url(
-            self.API_GOPLAY + '/tv/v1/programs/myList',
+            self.API_PLAY + '/tv/v1/programs/myList',
             authentication='Bearer %s' % self._auth.get_token()
         )
         result = json.loads(data)
@@ -545,7 +529,7 @@ class ContentApi:
     def mylist_add(self, program_id):
         """ Add a program on My List """
         self._put_url(
-            self.API_GOPLAY + '/tv/v1/programs/%s/myList' % program_id,
+            self.API_PLAY + '/tv/v1/programs/%s/myList' % program_id,
             data={'onMyList': True},
             authentication='Bearer %s' % self._auth.get_token()
         )
@@ -553,7 +537,7 @@ class ContentApi:
     def mylist_del(self, program_id):
         """ Remove a program on My List """
         self._put_url(
-            self.API_GOPLAY + '/tv/v1/programs/%s/myList' % program_id,
+            self.API_PLAY + '/tv/v1/programs/%s/myList' % program_id,
             data={'onMyList': False},
             authentication='Bearer %s' % self._auth.get_token()
         )
@@ -561,7 +545,7 @@ class ContentApi:
     def update_position(self, video_id, position):
         """ Update resume position of a video """
         self._put_url(
-            self.API_GOPLAY + '/tv/v1/videos/%s/position' % video_id,
+            self.API_PLAY + '/tv/v1/videos/%s/position' % video_id,
             data={'position': position},
             authentication='Bearer %s' % self._auth.get_token()
         )
@@ -569,7 +553,7 @@ class ContentApi:
     def delete_position(self, video_id):
         """ Update resume position of a video """
         self._delete_url(
-            self.API_GOPLAY + '/web/v1/videos/continue-watching/%s' % video_id,
+            self.API_PLAY + '/web/v1/videos/continue-watching/%s' % video_id,
             authentication='Bearer %s' % self._auth.get_token()
         )
 

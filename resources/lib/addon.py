@@ -124,13 +124,6 @@ def show_search(query=None):
     Search().show_search(query)
 
 
-@routing.route('/play/live/<channel>')
-def play_live(channel):
-    """ Play the requested item """
-    from resources.lib.modules.player import Player
-    Player().live(channel)
-
-
 @routing.route('/play/catalog')
 @routing.route('/play/catalog/<uuid>')
 @routing.route('/play/catalog/<uuid>/<content_type>')

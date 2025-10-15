@@ -5,8 +5,9 @@ import logging
 from datetime import datetime, timedelta
 
 from resources.lib import kodiutils
-from resources.lib.goplay import CHANNELS
-from resources.lib.goplay.epg import EpgApi
+from resources.lib.play.auth import AuthApi
+from resources.lib.play.content import ContentApi
+from resources.lib.play.epg import EpgApi
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,6 +18,8 @@ class IPTVManager:
     def __init__(self, port):
         """Initialize IPTV Manager object"""
         self.port = port
+        auth = AuthApi(kodiutils.get_setting('username'), kodiutils.get_setting('password'), kodiutils.get_tokens_path())
+        self._api = ContentApi(auth, cache_path=kodiutils.get_cache_path())
 
     def via_socket(func):  # pylint: disable=no-self-argument
         """Send the output of the wrapped function to socket"""
@@ -28,49 +31,49 @@ class IPTVManager:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect(('127.0.0.1', self.port))
             try:
-                sock.sendall(json.dumps(func()).encode())  # pylint: disable=not-callable
+                sock.sendall(json.dumps(func(self)).encode())  # pylint: disable=not-callable
             finally:
                 sock.close()
 
         return send
 
     @via_socket
-    def send_channels():  # pylint: disable=no-method-argument
+    def send_channels(self):  # pylint: disable=no-method-argument
         """Return JSON-STREAMS formatted information to IPTV Manager"""
         streams = []
-        for key, channel in CHANNELS.items():
-            if channel.get('iptv_id'):
+        channels = self._api.get_live_channels()
+        for channel in channels:
+            if channel.uuid:
                 streams.append({
-                    'id': channel.get('iptv_id'),
-                    'name': channel.get('name'),
-                    'logo': 'special://home/addons/{addon}/resources/logos/{logo}'.format(addon=kodiutils.addon_id(),
-                                                                                          logo=channel.get('logo')),
-                    'preset': channel.get('iptv_preset'),
-                    'stream': 'plugin://plugin.video.goplay/play/live/{channel}'.format(channel=key),
-                    'vod': 'plugin://plugin.video.goplay/play/epg/{channel}/{{date}}'.format(channel=key)
+                    'id': channel.uuid,
+                    'name': channel.title,
+                    'logo': channel.logo,
+                    'stream': 'plugin://plugin.video.play/play/catalog/{uuid}/live_channel'.format(uuid=channel.uuid),
+                    'vod': 'plugin://plugin.video.play/play/epg/{channel}/{{date}}'.format(channel=channel.uuid)
                 })
 
         return {'version': 1, 'streams': streams}
 
     @via_socket
-    def send_epg():  # pylint: disable=no-method-argument
+    def send_epg(self):  # pylint: disable=no-method-argument
         """Return JSON-EPG formatted information to IPTV Manager"""
         epg_api = EpgApi()
 
         today = datetime.today()
 
         results = {}
-        for key, channel in CHANNELS.items():
-            iptv_id = channel.get('iptv_id')
+        channels = self._api.get_live_channels()
+        for channel in channels:
+            uuid = channel.uuid
 
-            if channel.get('iptv_id'):
-                results[iptv_id] = []
+            if channel.uuid:
+                results[uuid] = []
 
                 for i in range(-3, 7):
                     date = today + timedelta(days=i)
-                    epg = epg_api.get_epg(key, date.strftime('%Y-%m-%d'))
+                    epg = epg_api.get_epg(channel.title.lower().split()[-1], date.strftime('%Y-%m-%d'))
 
-                    results[iptv_id].extend([
+                    results[uuid].extend([
                         {
                             'start': program.start.isoformat(),
                             'stop': (program.start + timedelta(seconds=program.duration)).isoformat(),

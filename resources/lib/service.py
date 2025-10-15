@@ -8,8 +8,8 @@ from threading import Event, Thread
 from xbmc import Monitor, Player, getInfoLabel
 
 from resources.lib import kodilogging, kodiutils
-from resources.lib.goplay.auth import AuthApi
-from resources.lib.goplay.content import ContentApi
+from resources.lib.play.auth import AuthApi
+from resources.lib.play.content import ContentApi
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class KodiPlayer(Player):
     def onPlayBackStarted(self):  # pylint: disable=invalid-name
         """Called when user starts playing a file"""
         self.path = getInfoLabel('Player.FilenameAndPath')
-        if self.path.startswith('plugin://plugin.video.goplay/'):
+        if self.path.startswith('plugin://plugin.video.play/'):
             self.listen = True
         else:
             self.listen = False
@@ -195,7 +195,7 @@ class KodiPlayer(Player):
             pass
 
     def update_resume(self):
-        """ Update resume position to goplay api """
+        """ Update resume position to Play api """
         video_id = self.path.split('/')[-2]
         # When seeking, Kodi Player sometimes returns a position greater than the total time
         if self.last_pos >= self.total:

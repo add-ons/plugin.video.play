@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 
 from resources.lib import kodiutils
 from resources.lib.kodiutils import TitleItem
-from resources.lib.goplay import STREAM_DICT
-from resources.lib.goplay.content import UnavailableException
-from resources.lib.goplay.epg import EpgApi
+from resources.lib.play import STREAM_DICT
+from resources.lib.play.content import UnavailableException
+from resources.lib.play.epg import EpgApi
 
 _LOGGER = logging.getLogger(__name__)
 
