@@ -133,17 +133,16 @@ class EpgApi:
         :type data: dict
         :rtype EpgProgram
         """
+        airing = False
         duration = int(data['program']['duration']) if data['program']['duration'] else None
         # Check if this broadcast is currently airing
         timestamp = datetime.now().replace(tzinfo=dateutil.tz.gettz('CET'))
         start = datetime.fromtimestamp(data['program']['timestamp']).replace(tzinfo=dateutil.tz.gettz('CET'))
         if duration:
             airing = bool(start <= timestamp < (start + timedelta(seconds=duration)))
-        else:
-            airing = False
 
         # Only allow direct playing if the linked video is the actual program
-        if data['program']['video']:
+        if data['program']['latestVideo']:
             video_url = data['program']['video']['uuid']
             thumb = data['program']['video']['data']['images']['default']
         else:
