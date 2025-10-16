@@ -79,7 +79,7 @@ class IPTVManager:
                             'stop': (program.start + timedelta(seconds=program.duration)).isoformat(),
                             'title': program.program_title,
                             'subtitle': program.episode_title,
-                            'description': program.description,
+                            'description': program.description or program.program_description,
                             'episode': 'S%sE%s' % (program.season, program.number) if program.season and program.number else None,
                             'genre': program.genre,
                             'genre_id': program.genre_id,
