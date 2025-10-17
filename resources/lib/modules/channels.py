@@ -64,7 +64,7 @@ class Channels:
             raise
 
         channel = next(channel for channel in items if channel.uuid == uuid)
-        channel_id = (channel.brand or channel.title).lower()
+        channel_id = channel.title.lower().replace(' ', '_')
 
         listing = []
 
