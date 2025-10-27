@@ -12,7 +12,6 @@ _LOGGER = logging.getLogger(__name__)
 SESSION = requests.session()
 PROXIES = kodiutils.get_proxies()
 
-@staticmethod
 def handle_error_message(response):
     """ Returns the error message of an Api request.
     :type response: requests.Response Object
