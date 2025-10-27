@@ -7,41 +7,19 @@ import os
 import re
 import time
 from datetime import datetime
-from xml.etree.ElementTree import XML
-
-import requests
 
 from resources.lib import kodiutils
+from resources.lib.play import utils
 from resources.lib.play import ResolvedStream
+from resources.lib.play.exceptions import NoContentException, UnavailableException
 from resources.lib.kodiutils import STREAM_DASH, STREAM_HLS, html_to_kodi
+from resources.lib.drm import get_license_keys, get_pssh_box
 
 _LOGGER = logging.getLogger(__name__)
 
 CACHE_AUTO = 1  # Allow to use the cache, and query the API if no cache is available
 CACHE_ONLY = 2  # Only use the cache, don't use the API
 CACHE_PREVENT = 3  # Don't use the cache
-
-PROXIES = kodiutils.get_proxies()
-
-
-class UnavailableException(Exception):
-    """ Is thrown when an item is unavailable. """
-
-
-class NoContentException(Exception):
-    """ Is thrown when no items are unavailable. """
-
-
-class GeoblockedException(Exception):
-    """ Is thrown when a geoblocked item is played. """
-
-
-class MissingModuleException(Exception):
-    """ Is thrown when a Python module is missing. """
-
-
-class ApiException(Exception):
-    """ Is thrown when the Api return an error. """
 
 
 class Program:
@@ -228,7 +206,6 @@ class ContentApi:
 
     def __init__(self, auth=None, cache_path=None):
         """ Initialise object """
-        self._session = requests.session()
         self._auth = auth
         self._cache_path = cache_path
 
@@ -267,7 +244,7 @@ class ContentApi:
         def update():
             """ Fetch the program metadata """
             # Fetch webpage
-            result = self._get_url(self.API_PLAY + '/tv/v2/programs/%s' % uuid)
+            result = utils.get_url(self.API_PLAY + '/tv/v2/programs/%s' % uuid)
             data = json.loads(result)
             return data
 
@@ -288,7 +265,7 @@ class ContentApi:
         def update():
             """ Fetch the program metadata """
             # Fetch webpage
-            result = self._get_url(self.API_PLAY + '/tv/v1/liveStreams', authentication='Bearer %s' % self._auth.get_token())
+            result = utils.get_url(self.API_PLAY + '/tv/v1/liveStreams', authentication='Bearer %s' % self._auth.get_token())
             data = json.loads(result)
             return data
 
@@ -313,7 +290,7 @@ class ContentApi:
         def update():
             """ Fetch the program metadata """
             # Fetch webpage
-            result = self._get_url(self.API_PLAY + '/tv/v1/playlists/%s?offset=%s&limit=%s' % (playlist_uuid, offset, limit), authentication='Bearer %s' % self._auth.get_token())
+            result = utils.get_url(self.API_PLAY + '/tv/v1/playlists/%s?offset=%s&limit=%s' % (playlist_uuid, offset, limit), authentication='Bearer %s' % self._auth.get_token())
             data = json.loads(result)
             return data
 
@@ -326,71 +303,84 @@ class ContentApi:
 
         return episodes
 
-    def get_stream(self, uuid, content_type):
-        """ Return a ResolvedStream for this video.
-        :type uuid: str
-        :type content_type: str
-        :rtype: ResolvedStream
+    def get_stream(self, uuid: str, content_type: str) -> ResolvedStream:
         """
-        mode = 'videos/long-form'
-        if content_type == 'video-short_form':
-            mode = 'videos/short-form'
-        elif content_type == 'live_channel':
-            mode = 'liveStreams'
-        response = self._get_url(self.API_PLAY + '/tv/v1/%s/%s' % (mode, uuid), authentication='Bearer %s' % self._auth.get_token())
+        Return a ResolvedStream for this video.
+
+        :param uuid: Unique ID of the video
+        :param content_type: Video type, e.g. 'video-short_form', 'live_channel'
+        :return: ResolvedStream
+        :raises UnavailableException: if the stream data cannot be retrieved
+        """
+        # Determine mode based on content type
+        mode_map = {
+            'video-short_form': 'videos/short-form',
+            'live_channel': 'liveStreams',
+        }
+        mode = mode_map.get(content_type, 'videos/long-form')
+
+        # Fetch stream info
+        url = f"{self.API_PLAY}/tv/v1/{mode}/{uuid}"
+        token = self._auth.get_token()
+        response = utils.get_url(url, authentication=f"Bearer {token}")
         data = json.loads(response)
 
         if not data:
-            raise UnavailableException
+            raise UnavailableException(f"No data for {uuid}")
 
-        # Get DRM license
-        key_headers = None
-        device_path = None
-        if data.get('drmXml'):
-            # BuyDRM format
-            # See https://docs.unified-streaming.com/documentation/drm/buydrm.html#setting-up-the-client
+        manifest_urls = data.get('manifestUrls') or {}
+        manifest_url = None
+        stream_type = None
 
-            key_headers = {
-                'customdata': data['drmXml']
-            }
+        # Manifest URLs (DASH or HLS)
+        if 'dash' in manifest_urls:
+            stream_type = STREAM_DASH
+            manifest_url = manifest_urls['dash']
+        elif 'hls' in manifest_urls:
+            stream_type = STREAM_HLS
+            manifest_url = manifest_urls['hls']
 
-            if kodiutils.get_setting_bool('enable_widevine_device') and kodiutils.get_setting('widevine_device'):
-                device_path = kodiutils.get_setting('widevine_device')
+        # SSAI fallback
+        elif data.get('adType') == 'SSAI' and data.get('ssai'):
+            ssai = data['ssai']
+            ssai_url = (
+                f"https://pubads.g.doubleclick.net/ondemand/dash/content/"
+                f"{ssai.get('contentSourceID')}/vid/{ssai.get('videoID')}/streams"
+            )
+            ad_data = json.loads(utils.post_url(ssai_url, data=''))
+            manifest_url = ad_data.get('stream_manifest')
+            stream_type = STREAM_DASH
 
-        # Get manifest url
-        if data.get('manifestUrls'):
+        if not manifest_url or not stream_type:
+            raise UnavailableException(f"No valid manifest found for {uuid}")
 
-            if data.get('manifestUrls').get('dash'):
-                # DASH stream
-                return ResolvedStream(
-                    uuid=uuid,
-                    url=data['manifestUrls']['dash'],
-                    stream_type=STREAM_DASH,
-                    license_key=self.create_license_key(self.LICENSE_URL, key_headers=key_headers, device_path=device_path, manifest_url=data['manifestUrls']['dash']),
+        # DRM setup
+        license_headers = None
+        license_keys = None
+        if drm_xml := data.get('drmXml'):
+            license_headers = {'customdata': drm_xml}
+
+            if (
+                kodiutils.get_setting_bool('enable_widevine_device')
+                and (device_path := kodiutils.get_setting('widevine_device'))
+            ):
+                # Widevine device-based DRM setup
+                pssh_box = get_pssh_box(manifest_url)
+                license_keys = get_license_keys(
+                    self.LICENSE_URL,
+                    license_headers,
+                    pssh_box,
+                    device_path,
                 )
 
-            # HLS stream
-            return ResolvedStream(
-                uuid=uuid,
-                url=data['manifestUrls']['hls'],
-                stream_type=STREAM_HLS,
-                license_key=self.create_license_key(self.LICENSE_URL, key_headers=key_headers),
-            )
-
-        # No manifest url found, get manifest from Server-Side Ad Insertion service
-        if data.get('adType') == 'SSAI' and data.get('ssai'):
-            url = 'https://pubads.g.doubleclick.net/ondemand/dash/content/%s/vid/%s/streams' % (
-                data.get('ssai').get('contentSourceID'), data.get('ssai').get('videoID'))
-            ad_data = json.loads(self._post_url(url, data=''))
-
-            # Server-Side Ad Insertion DASH stream
-            return ResolvedStream(
-                uuid=uuid,
-                url=ad_data['stream_manifest'],
-                stream_type=STREAM_DASH,
-                license_key=self.create_license_key(self.LICENSE_URL, key_headers=key_headers, device_path=device_path, manifest_url=ad_data['stream_manifest']),
-            )
-        raise UnavailableException
+        return ResolvedStream(
+            uuid=uuid,
+            url=manifest_url,
+            stream_type=stream_type,
+            license_url=self.LICENSE_URL,
+            license_headers=license_headers,
+            license_keys=license_keys,
+        )
 
     def get_program_tree(self):
         """ Get a content tree with information about all the programs.
@@ -428,7 +418,7 @@ class ContentApi:
 
         def update():
             """ Fetch the pages metadata """
-            data = self._get_url(self.API_PLAY + '/tv/v2/pages/%s' % page, authentication='Bearer %s' % self._auth.get_token())
+            data = utils.get_url(self.API_PLAY + '/tv/v2/pages/%s' % page, authentication='Bearer %s' % self._auth.get_token())
             result = json.loads(data)
             return result
 
@@ -458,7 +448,7 @@ class ContentApi:
             got_everything = False
             offset = 0
             while not got_everything:
-                data = self._get_url(self.API_PLAY + '/tv/v2/pages/%s/lanes/%s?limit=%s&offset=%s' % (page, index, limit, offset), authentication='Bearer %s' % self._auth.get_token())
+                data = utils.get_url(self.API_PLAY + '/tv/v2/pages/%s/lanes/%s?limit=%s&offset=%s' % (page, index, limit, offset), authentication='Bearer %s' % self._auth.get_token())
                 result = json.loads(data)
                 cards.extend(result.get('cards'))
                 total = result.get('total')
@@ -488,7 +478,7 @@ class ContentApi:
             cards = []
             got_everything = False
             while not got_everything:
-                data = self._post_url(self.API_PLAY + '/tv/v1/search', data=payload, authentication='Bearer %s' % self._auth.get_token())
+                data = utils.post_url(self.API_PLAY + '/tv/v1/search', data=payload, authentication='Bearer %s' % self._auth.get_token())
                 result = json.loads(data)
                 cards.extend(result.get('cards'))
                 total = result.get('total')
@@ -508,7 +498,7 @@ class ContentApi:
         """ Get the content of My List
         :rtype list[Program]
         """
-        data = self._get_url(
+        data = utils.get_url(
             self.API_PLAY + '/tv/v1/programs/myList',
             authentication='Bearer %s' % self._auth.get_token()
         )
@@ -528,7 +518,7 @@ class ContentApi:
 
     def mylist_add(self, program_id):
         """ Add a program on My List """
-        self._put_url(
+        utils.put_url(
             self.API_PLAY + '/tv/v1/programs/%s/myList' % program_id,
             data={'onMyList': True},
             authentication='Bearer %s' % self._auth.get_token()
@@ -536,7 +526,7 @@ class ContentApi:
 
     def mylist_del(self, program_id):
         """ Remove a program on My List """
-        self._put_url(
+        utils.put_url(
             self.API_PLAY + '/tv/v1/programs/%s/myList' % program_id,
             data={'onMyList': False},
             authentication='Bearer %s' % self._auth.get_token()
@@ -544,7 +534,7 @@ class ContentApi:
 
     def update_position(self, video_id, position):
         """ Update resume position of a video """
-        self._put_url(
+        utils.put_url(
             self.API_PLAY + '/tv/v1/videos/%s/position' % video_id,
             data={'position': position},
             authentication='Bearer %s' % self._auth.get_token()
@@ -552,7 +542,7 @@ class ContentApi:
 
     def delete_position(self, video_id):
         """ Update resume position of a video """
-        self._delete_url(
+        utils.delete_url(
             self.API_PLAY + '/web/v1/videos/continue-watching/%s' % video_id,
             authentication='Bearer %s' % self._auth.get_token()
         )
@@ -725,190 +715,6 @@ class ContentApi:
             title=data.get('title'),
         )
         return episode
-
-    def create_license_key(self, license_url, key_type='R', key_headers=None, key_value='', response_value='', device_path=None, manifest_url=None):
-        """ Create a license key string that we need for inputstream.adaptive.
-        :type key_url: str
-        :type key_type: str
-        :type key_headers: dict[str, str]
-        :type key_value: str
-        :type response_value: str
-        :rtype str
-        """
-        try:  # Python 3
-            from urllib.parse import quote, urlencode
-        except ImportError:  # Python 2
-            from urllib import quote, urlencode
-
-        if device_path and manifest_url:
-            pssh_box = self.get_pssh_box(manifest_url)
-            keys = self.get_decryption_keys(license_url, key_headers, pssh_box, device_path)
-            return 'org.w3.clearkey|%s' % keys[0]
-
-        header = ''
-        if key_headers:
-            header = urlencode(key_headers)
-
-        if key_type in ('A', 'R', 'B'):
-            key_value = key_type + '{SSM}'
-        elif key_type == 'D':
-            if 'D{SSM}' not in key_value:
-                raise ValueError('Missing D{SSM} placeholder')
-            key_value = quote(key_value)
-
-        return '%s|%s|%s|%s' % (license_url, header, key_value, response_value)
-
-    def get_pssh_box(self, manifest_url):
-        """ Get PSSH Box.
-        :type manifest_url: str
-        :rtype str
-        """
-        pssh_box = None
-        manifest_data = self._get_url(manifest_url)
-        manifest = XML(manifest_data)
-        mpd_ns = {'mpd': 'urn:mpeg:dash:schema:mpd:2011'}
-        cenc_ns = {'cenc': 'urn:mpeg:cenc:2013'}
-        adaptionset = manifest.find('mpd:Period', mpd_ns).find('mpd:AdaptationSet', mpd_ns)
-        pssh_box = adaptionset.findall('mpd:ContentProtection', mpd_ns)[1].find('cenc:pssh', cenc_ns).text
-        return pssh_box
-
-    def get_decryption_keys(self, license_url, headers, pssh_box, device_path):
-        """Get cenc decryption key from Widevine CDM.
-        :type license_url: str
-        :type headers: str
-        :type pssh_box: str
-        :type device_path: str
-        :rtype str
-        """
-        try:
-            from pywidevine.cdm import Cdm
-            from pywidevine.device import Device
-            from pywidevine.pssh import PSSH
-        except ModuleNotFoundError as exc:
-            raise MissingModuleException(exc)
-
-        # Load device
-        device = Device.load(device_path)
-
-        # Load CDM
-        cdm = Cdm.from_device(device)
-
-        # Open cdm session
-        session_id = cdm.open()
-
-        # Get license challenge
-        challenge = cdm.get_license_challenge(session_id, PSSH(pssh_box))
-
-        # Request
-        wv_license = self._post_url(license_url, headers=headers, data=challenge)
-
-        # parse license challenge
-        cdm.parse_license(session_id, wv_license)
-
-        # Get keys
-        decryption_keys = []
-        for key in cdm.get_keys(session_id):
-            if key.type == 'CONTENT':
-                decryption_keys.append('{}:{}'.format(key.kid.hex, key.key.hex()))
-
-        # close session, disposes of session data
-        cdm.close(session_id)
-
-        return decryption_keys
-
-    def _get_url(self, url, params=None, headers=None, authentication=None):
-        """ Makes a GET request for the specified URL.
-        :type url: str
-        :type authentication: str
-        :rtype str
-        """
-        try:
-            if authentication:
-                response = self._session.get(url, params=params, headers={
-                    'authorization': authentication,
-                }, proxies=PROXIES)
-            else:
-                response = self._session.get(url, params=params, headers=headers, proxies=PROXIES)
-            response.raise_for_status()
-        except requests.exceptions.HTTPError:
-            self._handle_error_message(response)
-
-        return response.text
-
-    def _post_url(self, url, params=None, headers=None, data=None, authentication=None):
-        """ Makes a POST request for the specified URL.
-        :type url: str
-        :type authentication: str
-        :rtype str
-        """
-        try:
-            if authentication:
-                response = self._session.post(url, params=params, json=data, headers={
-                    'authorization': authentication,
-                }, proxies=PROXIES)
-            else:
-                response = self._session.post(url, params=params, headers=headers, data=data, proxies=PROXIES)
-            response.raise_for_status()
-        except requests.exceptions.HTTPError:
-            self._handle_error_message(response)
-
-        return response.content
-
-    def _put_url(self, url, params=None, headers=None, data=None, authentication=None):
-        """ Makes a PUT request for the specified URL.
-        :type url: str
-        :type authentication: str
-        :rtype str
-        """
-        try:
-            if authentication:
-                response = self._session.put(url, params=params, json=data, headers={
-                    'authorization': authentication,
-                }, proxies=PROXIES)
-            else:
-                response = self._session.put(url, params=params, headers=headers, json=data, proxies=PROXIES)
-            response.raise_for_status()
-        except requests.exceptions.HTTPError:
-            self._handle_error_message(response)
-
-        return response.text
-
-    def _delete_url(self, url, params=None, headers=None, authentication=None):
-        """ Makes a DELETE request for the specified URL.
-        :type url: str
-        :type authentication: str
-        :rtype str
-        """
-        try:
-            if authentication:
-                response = self._session.delete(url, params=params, headers={
-                    'authorization': authentication,
-                }, proxies=PROXIES)
-            else:
-                response = self._session.delete(url, params=params, headers=headers, proxies=PROXIES)
-            response.raise_for_status()
-        except requests.exceptions.HTTPError:
-            self._handle_error_message(response)
-
-        return response.text
-
-
-    @staticmethod
-    def _handle_error_message(response):
-        """ Returns the error message of an Api request.
-        :type response: requests.Response Object
-        """
-        if response.json().get('message'):
-            message = response.json().get('message')
-        elif response.json().get('errormsg'):
-            message = response.json().get('errormsg')
-        else:
-            message = response.text
-
-        _LOGGER.error(message)
-        if response.status_code == 451:
-            raise GeoblockedException(message)
-        raise ApiException(message)
 
     def _handle_cache(self, key, cache_mode, update, ttl=30 * 24 * 60 * 60):
         """ Fetch something from the cache, and update if needed """

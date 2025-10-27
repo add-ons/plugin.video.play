@@ -8,7 +8,8 @@ import unittest
 from resources.lib import kodiutils
 from resources.lib.play import ResolvedStream
 from resources.lib.play.auth import AuthApi
-from resources.lib.play.content import ContentApi, GeoblockedException, Program, CACHE_PREVENT, Category
+from resources.lib.play.content import ContentApi, Program, CACHE_PREVENT, Category
+from resources.lib.play.exceptions import GeoblockedException
 
 _LOGGER = logging.getLogger(__name__)
 

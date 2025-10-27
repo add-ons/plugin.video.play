@@ -6,7 +6,9 @@ import logging
 from resources.lib import kodiutils
 from resources.lib.play.auth import AuthApi
 from resources.lib.play.aws.cognito_idp import AuthenticationException, InvalidLoginException
-from resources.lib.play.content import ApiException, ContentApi, GeoblockedException, MissingModuleException, UnavailableException
+from resources.lib.play.content import ContentApi
+from resources.lib.play.exceptions import ApiException, GeoblockedException, UnavailableException
+from resources.lib.drm import MissingModuleException
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,7 +36,7 @@ class Player:
         # Lookup the stream
         resolved_stream = self._resolve_stream(uuid, content_type)
         if resolved_stream:
-            kodiutils.play(resolved_stream.url, resolved_stream.stream_type, resolved_stream.license_key)
+            kodiutils.play(resolved_stream)
         return
 
     @staticmethod
