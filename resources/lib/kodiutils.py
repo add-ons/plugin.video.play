@@ -5,18 +5,14 @@ import logging
 import os
 import re
 
+from html import unescape
+from urllib.parse import quote, urlencode
+
 import xbmc
 import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
-
-try:  # Python 3
-    from html import unescape
-except ImportError:  # Python 2
-    from HTMLParser import HTMLParser
-
-    unescape = HTMLParser().unescape
 
 ADDON = xbmcaddon.Addon()
 
@@ -231,11 +227,11 @@ def show_listing(title_items, category=None, sort=None, content=None, cache=True
     xbmcplugin.endOfDirectory(routing.handle, succeeded, cacheToDisc=cache)
 
 
-def play(stream, stream_type=STREAM_HLS, license_key=None, title=None, art_dict=None, info_dict=None, prop_dict=None, stream_dict=None):
+def play(stream, title=None, art_dict=None, info_dict=None, prop_dict=None, stream_dict=None):
     """Play the given stream"""
     from resources.lib.addon import routing
 
-    play_item = xbmcgui.ListItem(label=title, path=stream)
+    play_item = xbmcgui.ListItem(label=title, path=stream.url)
     if art_dict:
         play_item.setArt(art_dict)
     if info_dict:
@@ -251,25 +247,43 @@ def play(stream, stream_type=STREAM_HLS, license_key=None, title=None, art_dict=
     else:
         play_item.setProperty('inputstreamaddon', 'inputstream.adaptive')
 
-    if stream_type == STREAM_HLS:
+    if stream.stream_type == STREAM_HLS:
         play_item.setProperty('inputstream.adaptive.manifest_type', 'hls')
         play_item.setMimeType('application/vnd.apple.mpegurl')
 
-    elif stream_type == STREAM_DASH:
+    elif stream.stream_type == STREAM_DASH:
+        from json import dumps
         play_item.setProperty('inputstream.adaptive.manifest_type', 'mpd')
         play_item.setMimeType('application/dash+xml')
+        drm_cfg = {}
         import inputstreamhelper
-        if license_key is not None:
+        if stream.license_keys:
             # Clearkey
-            if license_key.startswith('org.w3.clearkey'):
-                is_helper = inputstreamhelper.Helper('mpd')
-                if is_helper.check_inputstream():
-                    play_item.setProperty('inputstream.adaptive.drm_legacy', license_key)
+            if kodi_version_major() > 21:
+                drm_cfg['org.w3.clearkey'] = {
+                    'license': {
+                        'keyids': stream.license_keys
+                    }
+                }
+                play_item.setProperty('inputstream.adaptive.drm', dumps(drm_cfg))
             else:
-                # DRM protected MPEG-DASH
-                is_helper = inputstreamhelper.Helper('mpd', drm='com.widevine.alpha')
-                if is_helper.check_inputstream():
+                clearkey = generate_ia_license_key(license_keys=stream.license_keys)
+                play_item.setProperty('inputstream.adaptive.drm_legacy', clearkey)
+        elif stream.license_headers:
+            # Widevine
+            is_helper = inputstreamhelper.Helper('mpd', drm='com.widevine.alpha')
+            if is_helper.check_inputstream():
+                if kodi_version_major() > 21:
+                    drm_cfg['com.widevine.alpha'] = {
+                        'license': {
+                            'server_url': stream.license_url,
+                            'req_headers': urlencode(stream.license_headers)
+                        }
+                    }
+                    play_item.setProperty('inputstream.adaptive.drm', dumps(drm_cfg))
+                else:
                     play_item.setProperty('inputstream.adaptive.license_type', 'com.widevine.alpha')
+                    license_key = generate_ia_license_key(stream.license_url, license_headers=stream.license_headers)
                     play_item.setProperty('inputstream.adaptive.license_key', license_key)
         else:
             # Unprotected MPEG-DASH
@@ -279,6 +293,35 @@ def play(stream, stream_type=STREAM_HLS, license_key=None, title=None, art_dict=
     play_item.setContentLookup(False)
 
     xbmcplugin.setResolvedUrl(routing.handle, True, listitem=play_item)
+
+
+def generate_ia_license_key(license_url='', license_headers='', license_keys='', postdata_type='R', postdata_value='', response_type=''):
+    """Generates an InputStream Adaptive license_key
+    :type license_url: str
+    :type license_headers: str
+    :type license_keys: str
+    :type postdata_type: str
+    :type postdata_value: str
+    :type response_type: str
+    :type device_path: str
+    :type manifest_url: str
+    :rtype str
+    """
+
+    if license_keys:
+        return f'org.w3.clearkey|{",".join(f"{k}:{v}" for k, v in license_keys.items())}'
+
+    if license_headers:
+        license_headers = urlencode(license_headers)
+
+    if postdata_type in ('A', 'R', 'B'):
+        postdata_value = postdata_type + '{SSM}'
+    elif postdata_type == 'D':
+        if 'D{SSM}' not in postdata_value:
+            raise ValueError('Missing D{SSM} placeholder')
+        postdata_value = quote(postdata_value)
+
+    return f'{license_url}|{license_headers}|{postdata_value}|{response_type}'
 
 
 def get_search_string(heading='', message=''):
