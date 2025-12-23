@@ -6,7 +6,7 @@ import logging
 import os
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from resources.lib import kodiutils
 from resources.lib.play import utils
@@ -350,7 +350,7 @@ class ContentApi:
             )
             ad_data = json.loads(utils.post_url(ssai_url, data=''))
             manifest_url = ad_data.get('stream_manifest')
-            subtitle_url = self.extract_subtitle_from_manifest(manifest_url)
+            subtitle_url = self.adjust_subtitle(ad_data)
             stream_type = STREAM_DASH
 
         if not manifest_url or not stream_type:
@@ -384,6 +384,72 @@ class ContentApi:
             license_keys=license_keys,
             subtitles=[subtitle_url] if subtitle_url else [],
         )
+
+    def adjust_subtitle(self, ad_json):
+        """Adjust subtitle"""
+        subtitle_url = self.extract_subtitle_from_manifest(ad_json.get('stream_manifest'))
+        subtitle = utils.get_url(subtitle_url)
+
+        # Clean up old subtitles
+        subtitle_dir = os.path.join(kodiutils.addon_profile(), 'subs', '')
+        _, files = kodiutils.listdir(subtitle_dir)
+        if files:
+            for item in files:
+                kodiutils.delete(os.path.join(subtitle_dir, item))
+
+        # Cache original
+        subtitle_path = os.path.join(subtitle_dir, 'T888.Original.Dutch.vtt')
+        if not kodiutils.exists(subtitle_dir):
+            kodiutils.mkdirs(subtitle_dir)
+        with kodiutils.open_file(subtitle_path, 'w') as webvtt_output:
+            webvtt_output.write(subtitle)
+
+        time_events_url = ad_json.get('time_events_url')
+        data = utils.get_url(time_events_url)
+
+        events_json = json.loads(data)
+        cues = events_json.get('cuepoints')
+
+        ad_breaks = []
+        webvtt_timing_regex = re.compile(r'\n(\d{2}:\d{2}:\d{2}\.\d{3}) --> (\d{2}:\d{2}:\d{2}\.\d{3})\s')
+
+        for cue in cues:
+            duration = float(cue.get('end_float')) - float(cue.get('start_float'))
+            ad_breaks.append({
+                'start': cue.get('start_float'),
+                'duration': duration
+            })
+
+        subtitle = webvtt_timing_regex.sub(lambda match: self.adjust_webvtt_timing(match, ad_breaks), subtitle)
+
+        # Cache adjusted subtitles
+        subtitle_path = os.path.join(subtitle_dir, 'T888.Dutch.vtt')
+        with kodiutils.open_file(subtitle_path, 'w') as webvtt_output:
+            webvtt_output.write(subtitle)
+        return subtitle_path
+
+    def adjust_webvtt_timing(self, match, ad_breaks):
+        """Adjust the timing of a webvtt timestamp"""
+        sub_timings = []
+        for timestamp in match.groups():
+            hours, minutes, seconds, millis = (int(x) for x in [timestamp[:-10], timestamp[-9:-7], timestamp[-6:-4], timestamp[-3:]])
+            sub_timings.append(timedelta(hours=hours, minutes=minutes, seconds=seconds, milliseconds=millis))
+        original_start_time = sub_timings[0]
+        for ad_break in ad_breaks:
+            # time format: seconds.fraction or seconds
+            ad_break_start = timedelta(milliseconds=ad_break.get('start') * 1000)
+            ad_break_duration = timedelta(milliseconds=ad_break.get('duration') * 1000)
+            if ad_break_start <= original_start_time:
+                # advance start and end timestamp
+                for idx, item in enumerate(sub_timings):
+                    sub_timings[idx] -= ad_break_duration
+        for idx, item in enumerate(sub_timings):
+            hours, remainder = divmod(item.seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            millis = item.microseconds // 1000
+            sub_timings[idx] = '%02d:%02d:%02d.%03d' % (hours, minutes, seconds, millis)
+        adjusted_webvtt_timing = '\n{} --> {} '.format(sub_timings[0], sub_timings[1])
+        return adjusted_webvtt_timing
 
     def extract_subtitle_from_manifest(self, manifest_url):
         """Extract subtitle URL from a DASH manifest"""
