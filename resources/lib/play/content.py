@@ -330,6 +330,7 @@ class ContentApi:
 
         manifest_urls = data.get('manifestUrls') or {}
         manifest_url = None
+        subtitle_url = None
         stream_type = None
 
         # Manifest URLs (DASH or HLS)
@@ -344,11 +345,12 @@ class ContentApi:
         elif data.get('adType') == 'SSAI' and data.get('ssai'):
             ssai = data['ssai']
             ssai_url = (
-                f"https://pubads.g.doubleclick.net/ondemand/dash/content/"
-                f"{ssai.get('contentSourceID')}/vid/{ssai.get('videoID')}/streams"
+                f'https://pubads.g.doubleclick.net/ondemand/dash/content/'
+                f'{ssai.get('contentSourceID')}/vid/{ssai.get('videoID')}/streams'
             )
             ad_data = json.loads(utils.post_url(ssai_url, data=''))
             manifest_url = ad_data.get('stream_manifest')
+            subtitle_url = self.extract_subtitle_from_manifest(manifest_url)
             stream_type = STREAM_DASH
 
         if not manifest_url or not stream_type:
@@ -380,7 +382,46 @@ class ContentApi:
             license_url=self.LICENSE_URL,
             license_headers=license_headers,
             license_keys=license_keys,
+            subtitles=[subtitle_url],
         )
+
+    def extract_subtitle_from_manifest(self, manifest_url):
+        """Extract subtitle URL from a DASH manifest"""
+        from xml.etree.ElementTree import fromstring
+
+        manifest_data = utils.get_url(manifest_url)
+        manifest = fromstring(manifest_data)
+
+        ns = {'mpd': 'urn:mpeg:dash:schema:mpd:2011'}
+
+        base_url_el = manifest.find('mpd:BaseURL', ns)
+        if base_url_el is None or not base_url_el.text:
+            return None
+
+        base_url = base_url_el.text
+
+        for adaption in manifest.iterfind(
+            './/mpd:AdaptationSet[@contentType="text"]', ns
+        ):
+            rep = adaption.find('mpd:Representation', ns)
+            if rep is None:
+                continue
+
+            sub_base = rep.find('mpd:BaseURL', ns)
+            if sub_base is None or not sub_base.text:
+                continue
+
+            sub_path = sub_base.text
+            if 'T888' not in sub_path:
+                continue
+
+            # Strip period-specific suffix safely
+            name, _, ext = sub_path.rpartition('.')
+            clean_path = name.rsplit('_', 1)[0] + '.' + ext
+
+            return base_url + clean_path
+
+        return None
 
     def get_program_tree(self):
         """ Get a content tree with information about all the programs.

@@ -240,6 +240,8 @@ def play(stream, title=None, art_dict=None, info_dict=None, prop_dict=None, stre
         play_item.setProperties(prop_dict)
     if stream_dict:
         play_item.addStreamInfo('video', stream_dict)
+    if stream.subtitles:
+        play_item.setSubtitles(stream.subtitles)
 
     # Setup Inputstream Adaptive
     if kodi_version_major() >= 19:
