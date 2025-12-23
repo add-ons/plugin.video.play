@@ -5,6 +5,7 @@ import logging
 import os
 import re
 
+from contextlib import contextmanager
 from html import unescape
 from urllib.parse import quote, urlencode
 
@@ -703,6 +704,14 @@ def jsonrpc(*args, **kwargs):
     return loads(xbmc.executeJSONRPC(dumps(kwargs)))
 
 
+@contextmanager
+def open_file(path, flags='r'):
+    """Open a file (using xbmcvfs)"""
+    fdesc = xbmcvfs.File(path, flags)
+    yield fdesc
+    fdesc.close()
+
+
 def listdir(path):
     """Return all files in a directory (using xbmcvfs)"""
     return xbmcvfs.listdir(path)
@@ -711,3 +720,14 @@ def listdir(path):
 def delete(path):
     """Remove a file (using xbmcvfs)"""
     return xbmcvfs.delete(path)
+
+
+def mkdirs(path):
+    """Create directory including parents (using xbmcvfs)"""
+    _LOGGER.debug('Recursively create directory (%s)', path)
+    return xbmcvfs.mkdirs(path)
+
+
+def exists(path):
+    """Whether the path exists (using xbmcvfs)"""
+    return xbmcvfs.exists(path)
