@@ -382,7 +382,7 @@ class ContentApi:
             license_url=self.LICENSE_URL,
             license_headers=license_headers,
             license_keys=license_keys,
-            subtitles=[subtitle_url],
+            subtitles=[subtitle_url] if subtitle_url else [],
         )
 
     def extract_subtitle_from_manifest(self, manifest_url):
