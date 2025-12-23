@@ -346,7 +346,7 @@ class ContentApi:
             ssai = data['ssai']
             ssai_url = (
                 f'https://pubads.g.doubleclick.net/ondemand/dash/content/'
-                f'{ssai.get('contentSourceID')}/vid/{ssai.get('videoID')}/streams'
+                f'{ssai.get("contentSourceID")}/vid/{ssai.get("videoID")}/streams'
             )
             ad_data = json.loads(utils.post_url(ssai_url, data=''))
             manifest_url = ad_data.get('stream_manifest')
