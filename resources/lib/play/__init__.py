@@ -11,7 +11,7 @@ STREAM_DICT = {
 class ResolvedStream:
     """ Defines a stream that we can play"""
 
-    def __init__(self, uuid=None, url=None, stream_type=None, license_url=None, license_headers=None, license_keys=None):
+    def __init__(self, uuid=None, url=None, stream_type=None, license_url=None, license_headers=None, license_keys=None, subtitles=None):
         """
         :type uuid: str
         :type url: str
@@ -19,6 +19,7 @@ class ResolvedStream:
         :type license_url: str
         :type license_headers: str
         :type license_keys: dict
+        :type subtitles: list[str]
         """
         self.uuid = uuid
         self.url = url
@@ -26,6 +27,7 @@ class ResolvedStream:
         self.license_url = license_url
         self.license_headers = license_headers
         self.license_keys = license_keys
+        self.subtitles = subtitles
 
     def __repr__(self):
         return "%r" % self.__dict__
