@@ -639,7 +639,7 @@ class ContentApi:
                     title=card.get('title'),
                     category_id=str(card.get('categoryId')),
                     category_name=card.get('category') or 'No category',
-                    poster=card.get('images')[0].get('url'),
+                    poster=card.get('images')[0].get('url') if card.get("images") else None,
                     channel=card.get('brand'),
                 ))
             elif card.get('type') == 'VIDEO':
@@ -651,7 +651,7 @@ class ContentApi:
                     description=html_to_kodi(card.get('description')),
                     duration=card.get('duration'),
                     position=card.get('position'),
-                    thumb=card.get('images')[0].get('url'),
+                    thumb=card.get('images')[0].get('url') if card.get("images") else None,
                     program_title=card.get('title'),
                     aired=datetime.fromtimestamp(card.get('dates', {}).get('publishDate', 0.0) or 0.0),
                     expiry=datetime.fromtimestamp(card.get('dates', {}).get('unpublishDate', 0.0) or 0.0),
