@@ -70,6 +70,7 @@ class Catalog:
             kodiutils.end_of_directory()
             return
 
+        kodiutils.state["program_title"] = program.title
         # Go directly to the season when we have only one season
         if len(program.seasons) == 1:
             self.show_season(list(program.seasons.values())[0].uuid)

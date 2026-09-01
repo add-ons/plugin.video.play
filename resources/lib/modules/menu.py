@@ -167,6 +167,17 @@ class Menu:
         # Episode
         #
         if isinstance(item, Episode):
+            if not item.program_title:
+                item.program_title = kodiutils.state["program_title"]
+
+            if not item.season:
+                import re
+                m = re.match(r"[sS](\d+)[-]?[aA](\d+)", item.title)
+                _LOGGER.info(f'm is {m}')
+                if m:
+                    item.season=int(m.group(1))
+                    item.number=int(m.group(2))
+
             info_dict.update({
                 'mediatype': 'episode',
                 'tvshowtitle': item.program_title,

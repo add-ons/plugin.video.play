@@ -49,6 +49,12 @@ STREAM_DASH = 'mpd'
 
 _LOGGER = logging.getLogger(__name__)
 
+state = {
+    "program_title": None,
+    "episode_title": None,
+    "season": None,
+    "episode": None
+}
 
 class TitleItem:
     """ This helper object holds all information to be used with Kodi xbmc's ListItem object """
