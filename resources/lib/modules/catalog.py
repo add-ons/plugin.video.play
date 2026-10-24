@@ -65,6 +65,14 @@ class Catalog:
             kodiutils.end_of_directory()
             return
 
+        # Show the movie as a single playable item
+        if not program.seasons and program.video:
+            title_item = Menu.generate_titleitem(program.video)
+            title_item.info_dict['mediatype'] = 'movie'
+            title_item.art_dict['poster'] = program.poster
+            kodiutils.show_listing([title_item], 30003, content='movies')
+            return
+
         if not program.seasons:
             kodiutils.ok_dialog(message=kodiutils.localize(30717))  # This program is not available in the catalogue.
             kodiutils.end_of_directory()

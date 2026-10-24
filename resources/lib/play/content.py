@@ -26,7 +26,7 @@ class Program:
     """ Defines a Program. """
 
     def __init__(self, uuid=None, path=None, channel=None, category_id=None, category_name=None, title=None, description=None, aired=None, expiry=None, poster=None, thumb=None, fanart=None, seasons=None,
-                 my_list=False):
+                 my_list=False, video=None):
         """
         :type uuid: str
         :type path: str
@@ -42,6 +42,7 @@ class Program:
         :type fanart: str
         :type seasons: list[Season]
         :type my_list: bool
+        :type video: Episode
         """
         self.uuid = uuid
         self.path = path
@@ -57,6 +58,7 @@ class Program:
         self.fanart = fanart
         self.seasons = seasons
         self.my_list = my_list
+        self.video = video
 
     def __repr__(self):
         return "%r" % self.__dict__
@@ -619,6 +621,19 @@ class ContentApi:
             )
             for key, playlist in enumerate(data.get('playlists', [])) if playlist.get('title')
         }
+
+        # Movies have no playlists, nextVideo is the movie itself
+        if not program.seasons and data.get('nextVideo'):
+            program.video = Episode(
+                uuid=data.get('nextVideo'),
+                channel=data.get('brand'),
+                program_title=data.get('title'),
+                title=data.get('title'),
+                description=program.description,
+                thumb=program.fanart,
+                duration=data.get('duration'),
+                content_type='long_form',
+            )
 
         return program
 
